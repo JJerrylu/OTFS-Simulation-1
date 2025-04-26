@@ -1,0 +1,169 @@
+% =========================================================================
+% Book title: OTFS Modulation: Theory and Applications
+% Author: Saif Khan Mohammed, Ronny Hadani and Ananthanarayanan
+% Chockalingam
+% Editor: Wiley-IEEE Press
+% Date: Oct. 2024
+% Description: This Matlab program generates the heatmap for the Relative
+% Prediction Error (RPE) as plotted in Fig 2.27 of the book for three
+% different Zak-OTFS modulations corrsponding to \nu_p = 240 KHz, 30 KHz, 1.25 KHz
+% for a two-path channel. For generating the three heatmaps in Fig. 2.27,
+% this program needs to be run separately for each of \nu_p = 240 KHz, 30
+% KHz, 1.25 KHz.
+% RPE is calculated as per equation (2.89) in the book. Pulse shaping
+% filter is Sinc (see equation (2.80) in book). For a given input (i.e., channel delay and Doppler spread,
+% bandwidth and time duration of Zak-OTFS pulsone, and \nu_p) the
+% program outputs a 2-D heatmap plot of the RPE
+% =========================================================================
+clc;
+clear all;
+
+%----- Program INPUTs---------------------
+delayspread = 5e-6; % Channel delay spread in seconds
+Dopplerspread = 1630; % Channel Doppler spread in Hz
+B = 0.96e6; % Pulsone bandwidth in Hz
+T = 1.6e-3; % Pulsone time duration in seconds
+nup = 30e3; % Zak-OTFS modulation parameter \nu_p in Hz
+taup = 1/nup;
+%----------------------------------
+
+%------- Channel parameters--------
+numPaths = 2; % Number of channel paths is 2
+delayP = [ 0 , delayspread ] ;  % The first path induces zero delay shift
+dopplerP =  0.5*Dopplerspread*[1 , -1]; % First path induces a Doppler shift of 0.5*Dopplerspread
+                                        % second path induces a Doppler shift
+                                        % of -0.5*Dopplerspread
+hgainP =  1/sqrt(2) * [ 1 , 1]; % Channel gain for each path is 1/sqrt(2)
+
+
+
+%------- Zak-OTFS modulation variables
+M = round(B*taup); % M = B \tau_p
+N = round(T*nup);  % N = T \nu_p
+BT = round(B * T) ;
+btau = B*delayP; %Normalized path delays
+tdopplerP = T*dopplerP; % Normalized path Doppler shift
+
+
+    for ijk=1:1:numPaths
+    hgainmodP(ijk) =  hgainP(ijk)*exp(-1i*2*pi*delayP(ijk)*dopplerP(ijk));
+    end
+    
+    % Variable hdd(.,.) is the effective DD domain channel h_{eff}[k,l] with
+    % sinc pulse shaping
+    hdd = zeros(4*M-1, 4*N-1); % h_{eff} is computed for taps which are outisde the fundamental DD period
+                               % so as to model DD domain aliasing
+    for ind1=1:1:(4*M-1)
+        for ind2 =1:1:(4*N-1)
+            p = ind1 - 2*M ;
+            q = ind2 - 2*N ;
+            tmp_sum = 0;
+            
+            for ijk=1:1:numPaths
+                f12 = @(x) exp(1i*pi*(p + btau(ijk))*x/BT) .* sinc(q - x)  .* sinc(x - tdopplerP(ijk)) .* (1 - abs(x/BT)) .* sinc((p - btau(ijk)) * (1 - abs(x/BT)) )  ;
+                tmp_sum = tmp_sum + hgainmodP(ijk)*integral(f12, max(max(-BT,tdopplerP(ijk) - 20), q - 20), min(min(BT,tdopplerP(ijk) + 20), q+20));
+            end
+            hdd(ind1, ind2) = tmp_sum ;
+        end
+    end
+    
+    % H_otfs is the effective MN X MN DD domain channel matrix, see the
+    % mattrix H_{dd} in equations (2.95) and (2.96) of the book
+    % equation (2.96) describes how the elements of H_{d} matrix depend on
+    % the effective DD domain channel fikter h_{eff}[k,l]
+    
+    H_otfs = zeros(BT, round(BT)); 
+    for kprime=0:1:(M-1)
+        for lprime=0:1:(N-1)
+            for k=0:1:(M-1)
+                for l=0:1:(N-1)
+                    for n=-1:1:1
+                        for m=-1:1:1
+                     % The following equation is based on equation (2.95)
+                     % in the book
+                     H_otfs(lprime*M + kprime + 1, l*M + k + 1) =  H_otfs(lprime*M + kprime + 1, l*M + k + 1) + hdd(2*M + kprime - k - n*M, 2*N+lprime - l - m*N) * exp(1i*2*pi*(lprime - l - m*N)*(k + n*M)/BT) * exp(1i*2*pi*n*l/N);
+                        
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+
+
+    % pilot location: DD location of pulse transmitted for estimating the taps of h_{eff}[k,l]
+    kp = round(M/2);
+    lp = round(N/2);
+    
+    % Variable hdd_est(.,.) models  \widehat{h}_{eff}[k,l] in the book
+    % which is the estimate of the effective DD channel filter h_{eff}
+    % based on the received DD channel response to the pilot DD pulse
+    % transmitted at (M/2, N/2)
+    for kprime=0:1:(M-1)
+        for lprime=0:1:(N-1)
+           % The following equation implements equation (2.86) in the book
+           hdd_est(kp + kprime - kp + 1, lp + lprime -lp + 1) =  H_otfs(lprime*M + kprime + 1, lp*M + kp + 1) * exp(-1i*2*pi*(lprime - lp)*kp/BT);
+        end
+    end
+
+    % H_otfs_est is the estimated effective DD domain channel matrix based
+    % on the estimated channel filter hdd_est (constructed based on
+    % equation (2.95) in book)
+  
+    H_otfs_est = zeros(BT, round(BT));
+    est_error = zeros(M,N);
+    for k=0:1:(M-1)
+        for l=0:1:(N-1)
+            
+            for kprime=0:1:(M-1)
+               for lprime=0:1:(N-1)
+                  for n=-1:1:1
+                      for m=-1:1:1
+                          k_index = kp + kprime - k - n*M + 1 ;
+                          l_index = lp + lprime - l -m*N + 1 ;
+                          if ((k_index > 0) && (k_index <= M) && (l_index > 0) && (l_index <= N))
+                             % this equation is based on (2.95) in the book
+                             H_otfs_est(lprime*M + kprime + 1, l*M + k + 1) = hdd_est(k_index,l_index) *  exp(1i*2*pi*(lprime - l - m*N)*(k + n*M)/BT) * exp(1i*2*pi*n*l/N) ;
+                          end
+                      end
+                  end
+                  % est_error(k^(g)+1, l^(g)+1) is the un-normalized numerator 
+                  % in the R.H.S. of equation (2.89) in the book
+                  est_error(k+1,l+1) = est_error(k+1, l+1) + abs(H_otfs_est(lprime*M + kprime + 1, l*M + k + 1) -  H_otfs(lprime*M + kprime + 1, l*M + k + 1))^2 ;
+               end
+            end
+            
+             
+            
+        end
+    end
+
+
+      %Heatmap plot for RPE 
+
+
+      figure(22);
+      % Normalization and plotting the heatmap of RPE (see equation (2.89)
+      % in the book)
+      hmtap_hndl = heatmap(10*log10(est_error'/(norm(hdd,'fro')^2)),'CellLabelColor','none');
+      xv = string((1:M)); %Delay
+      yv = string((1:N)); %Doppler
+      xv(2:end-1) = "" ;
+      yv(2:end-1) = "" ; 
+      hmtap_hndl.XDisplayLabels = xv;
+      hmtap_hndl.YDisplayLabels = yv;
+      hmtap_hndl.XLabel = 'Delay Domain' ;
+      hmtap_hndl.YLabel = 'Doppler Domain' ;
+      hmtap_hndl.Title = 'Relative Prediction Error (dB)';
+      hmtap_hndl.FontSize = 40;
+      hmtap_hndl.Colormap = parula;
+      hmtap_hndl.ColorLimits = [-80 , 3];
+      
+  
+
+
+
+    
+
+
