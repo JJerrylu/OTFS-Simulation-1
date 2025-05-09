@@ -5,7 +5,7 @@ clear all; close all; clc;
 L = 3;            % Number of delay bins
 K = 4;            % Number of Doppler bins
 N = L * K;        % Total number of time samples
-SNR_dB = 10;      % SNR in dB for the AWGN channel
+SNR_dB = 20;      % SNR in dB for the AWGN channel
 
 %% Generate delay-Doppler domain symbols (e.g., QPSK)
 % Here we use QPSK symbols from the set {1+j, 1-j, -1+j, -1-j}

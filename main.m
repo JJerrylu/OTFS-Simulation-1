@@ -69,15 +69,15 @@ noCodedbits = size(parityCheck_matrix,2);               % Find the Codeword leng
 berOFDM = zeros(length(EbNo),3); berCOFDM = zeros(length(EbNo),3); berOTFS = zeros(length(EbNo),3); berCOTFS = zeros(length(EbNo),3);
 errorStats_coded = zeros(1,3); errorStats_uncoded = zeros(1,3);
 
-for repetition=1:repeats                                % Repeat simulation multiple times with a unqique channel for each repeat
-    
+% for repetition=1:repeats                                % Repeat simulation multiple times with a unqique channel for each repeat
+   
     % Generate and Encode data
     [dataIn, dataBits_in, codedData_in, packetSize, numPackets, numCB] = dataGen(k,numDC,ofdmSym,totalBits,codeRate,ldpcEncoder);
     
     % Generate Rayleigh Fading Channel Impulse Response
     txSig_size = zeros((numSC+cpLen),ofdmSym);                       % Assign the size of the channel
     rayChan = multipathChannel(cpSize, scs, txSig_size, velocity);   % Create fading channel impulse response
-    
+   
     % QAM Modulator
     qamTx = qammod(dataIn,M,'InputType','bit','UnitAveragePower',true);    % Apply QAM modulation
     parallelTx = reshape(qamTx,[numDC,ofdmSym*packetSize]);                % Convert to parallel
@@ -87,7 +87,7 @@ for repetition=1:repeats                                % Repeat simulation mult
     % Add 11 nulls around DC
     guardbandTx = [guardbandTx(1:(numDC/2),:); zeros(11,ofdmSym*packetSize); guardbandTx((numDC/2)+1:end,:)];
     
-    
+  %{  
 %--------------------------------------------------------------------------
 %                       OFDM BER Calculation
 %--------------------------------------------------------------------------
@@ -270,7 +270,7 @@ end
 %--------------------------------------------------------------------------
 %                           Figures
 %-------------------------------------------------------------------------- 
-
+  
 % Plot BER / EbNo curves
 plotGraphs(berOFDM, berCOFDM, berOTFS, berCOTFS, M, numSC, EbNo);
-
+   %}

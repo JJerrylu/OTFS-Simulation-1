@@ -79,22 +79,26 @@ end
 
 
 % % 3D plot of channnel model
-% figure
-% absH = 10*log10(abs(H));
-% mesh(absH)
-% surf(absH)
-% colormap(jet)    % change color map
-% shading interp    % interpolate colors across lines and faces
-% hold on;
-% title(['Time-Frequency Plot of The Fading Channel']);
-% xlabel('Frequency (MHz)');
-% xticks([8 142 274 408 540])
-% xticklabels({'3.496','3.498','3.500','3.502','3.504'})
-% ylabel('Time (ms)');
-% yticks([0 14 28 42 56 70 84 98 112 126 140])
-% yticklabels({'0','1','2','3','4','5','6','7','8','9','10'})
-% zlabel('Power (dB');
-% hold off;
+figure
+%absH = 10*log10(abs(H));
+absH = abs(H);
+%mesh(absH)
+surf(absH)
+colormap jet    % change color map
+shading flat %interp    % interpolate colors across lines and faces
+
+hold on;
+title(['Time-Frequency Plot of The Fading Channel']);
+xlabel('Frequency (MHz)');
+xticks([8 142 274 408 540])
+xticklabels({'3.496','3.498','3.500','3.502','3.504'})
+ylabel('Time (ms)');
+yticks([0 14 28 42 56 70 84 98 112 126 140])
+yticklabels({'0','1','2','3','4','5','6','7','8','9','10'})
+zlabel('Amplitude')
+%zlabel('Power (dB');
+grid on;
+hold off;
 
 
 % Convert to serial

@@ -5,7 +5,7 @@ clear all; close all; clc;
 L = 3;            % Number of delay bins
 K = 4;            % Number of Doppler bins
 N = L * K;        % Total number of time samples
-SNR_dB = 10;      % SNR in dB for the AWGN channel
+SNR_dB = 20;      % SNR in dB for the AWGN channel
 
 %% Generate delay-Doppler domain symbols (e.g., QPSK) for data transmission
 % QPSK constellation: {1+j, 1-j, -1+j, -1-j}
@@ -68,7 +68,7 @@ H_true(1,1) = 1;        % Path 1 at (0,0)
 H_true(2,2) = 0.8;      % Path 2 at (k=1, l=1) [mapping Doppler shift +0.1 to bin 2]
 H_true(4,3) = 0.5;      % Path 3 at (k= -1, l=2) [for K=4, bin 4 represents a negative Doppler]
       
-%% Simulate Channel Effect on Data Signal in Time Domain
+%% Simulate multipath propagation Data Signal in Time Domain
 % Each path: circular shift by delay and apply Doppler phase modulation.
 Y_channel = zeros(N,1);  % initialize channel output
 
@@ -173,6 +173,34 @@ subplot(1,2,2);
 bar3(abs(H_est));
 title('Estimated Channel Impulse Response (Magnitude) - Image');
 xlabel('Delay index (l)'); ylabel('Doppler index (k)');
+
+%% Coarse channel equalization
+
+Z_X_est = Z_rx./H_est;
+
+%% Plot the equalized received data (3D Bar Chart)
+figure;
+subplot(2,2,1);
+bar3(real(Z_tx));
+title('Tx Data: Delay-Doppler (Real)');
+xlabel('Delay index (l)'); ylabel('Doppler index (k)'); zlabel('Amplitude');
+
+subplot(2,2,2);
+bar3(imag(Z_tx));
+title('Tx Data: Delay-Doppler (Imag)');
+xlabel('Delay index (l)'); ylabel('Doppler index (k)'); zlabel('Amplitude');
+
+
+subplot(2,2,3);
+bar3(real(Z_X_est));
+title('Estimated data: (Delay-Doppler (Real)');
+xlabel('Delay index (l)'); ylabel('Doppler index (k)');
+
+subplot(2,2,4);
+bar3(imag(Z_X_est));
+title('Estimated data: (Delay-Doppler (image)');
+xlabel('Delay index (l)'); ylabel('Doppler index (k)');
+
 
 %% Display Key Matrices for Reference
 disp('Transmitted Data Delay-Doppler Grid (Z_tx):');
