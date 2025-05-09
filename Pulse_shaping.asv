@@ -9,22 +9,19 @@ taup      = 1/nup;             % Delay parameter tau_p [s]
 M         = round(B * taup);   % Number of delay bins
 N         = round(T * nup);    % Number of Doppler bins
 BT = M * N;          % number of time‑domain samples
-over_sampling_rate = 1;
-t = (0:BT-1)/(over_sampling_rate*B);   % centered time axis
+over_sampling_rate = 10;
+t = (0:BT-1)*over_sampling_rate/B;   % centered time axis
 
 % → delay‑domain kernel (sinc in t)
 w_tau = sqrt(B) * sinc(B * t);
-figure; plot(t, real(w_tau)); hold on; plot(t, imag(w_tau));
-title('w\_tx1(tau)');
+figure; plot(t, real(w_tau)); hold on; plot(t, imag(w_nu_inv));
+title('Time‑domain transmit pulse shape w\_tx(t)');
 xlabel('t [s]'); legend('Re','Im');
 
 
 % → Doppler‑domain kernel (rect in t)
 %    rectpuls(x) = 1 for |x|<0.5, 0.5 at |x|=0.5, 0 elsewhere
 w_nu_inv = rectpuls(t / T)/sqrt(T);
-figure; plot(t, real(w_nu_inv)); hold on; plot(t, imag(w_nu_inv));
-title('w\_tx2(t) ');
-xlabel('t [s]'); legend('Re','Im');
 
 % convolution (保持 same length)，注意離散化要除以 Fs
 wtx_time = conv(w_tau, w_nu_inv, 'same') / Fs;

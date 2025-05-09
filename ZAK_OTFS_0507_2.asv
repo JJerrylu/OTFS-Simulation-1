@@ -1,0 +1,322 @@
+% ----------------------------------------------------
+% OTFS System Simulation (DZT & 2-step)
+% BPSK + Pulse Shaping + Multipath + MMSE Detection
+% ----------------------------------------------------
+clc; clear; close all;
+
+% --- System Parameters ---
+B = 60e3;                 % Bandwidth (Hz)
+Ts = 1/B;                 % Symbol period (s)
+T = 4.27e-3;              % Frame duration
+K = 16;                   % Doppler bins
+L = 16;                   % Delay bins
+N = K * L;                % Total symbols
+P = 4;                    % Channel paths
+rolloff = 0;              % Pulse shaping roll-off (γ)
+osr = 10;                 % Oversampling rate
+
+% Delay & Doppler resolution
+tau_max = 8 * Ts;
+nu_max = 937;             % Max Doppler (Hz)
+nu_max =
+% SNR range & simulation settings
+SNR_dB_range = 0:5:30;
+num_iter = 10;
+
+% BER record
+ber_dzt = zeros(size(SNR_dB_range));
+ber_2step = zeros(size(SNR_dB_range));
+
+
+% Pulse support (±Ts * span)
+  pulse_span = 4;
+% -------------------------------
+% Pulse Shaping function
+% -------------------------------
+function p = pulse_shape(t, Ts, gamma)
+    sinc_term = sinc(t / Ts);
+    cos_term = cos(gamma * pi * t / Ts);
+    denom = 1 - (2 * gamma * t / Ts).^2;
+    p = sinc_term .* cos_term ./ denom;
+    p = p / norm(p);  % Normalize energy if needed
+    p(isnan(p)) = 1;  % 處理 t = 0
+end
+
+for idx = 1:length(SNR_dB_range)
+    SNR_dB = SNR_dB_range(idx);
+    SNR_linear = 10^(SNR_dB/10);
+    noise_var = 1/SNR_linear;
+
+    err_dzt = 0;
+    err_2step = 0;
+    total_bits = 0;
+
+    for trial = 1:num_iter
+        % -------------------------------
+        % BPSK Mapping
+        % -------------------------------
+        tx_bits = randi([0 1], K*L, 1);            
+        tx_symbols = 2 * tx_bits - 1;              % BPSK 0 → -1, 1 → +1
+        Zx = reshape(tx_symbols, K, L);            % K×L DD information signal
+        % ----------------------------
+% DZT-OTFS modulator
+% ----------------------------
+    tx_grid = zeros(K, L);
+    for l = 1:L
+        % 對每個延遲 bin 的 Doppler vector 做 IFFT
+        tx_grid(:, l) = ifft(Zx(:, l), K);  % 沿 Doppler軸IFFT
+    end
+    % P/S to time domain signal (column)
+    tx_dzt = reshape(tx_grid, K*L, 1);
+
+
+% ----------------------------
+% 2-step OTFS modulator（ISFFT + OFDM-like）
+% ----------------------------
+
+    % SFFT = DFT along delay (L), IFFT along Doppler (K)
+    sfft_temp = zeros(K, L);
+    for k = 1:K
+        sfft_temp(k, :) = fft(Zx(k, :), L);  % Delay DFT
+    end
+    tx_2step_TF = zeros(K, L);
+    for l = 1:L
+        tx_2step_TF(:, l) = ifft(sfft_temp(:, l), K);  % Doppler IFFT
+    end
+    
+    % freq to delay(K-point IFFT)
+    tx_time_temp = zeros(K,L);
+    for k= 1:K
+        tx_time_temp(k,:) = ifft(tx_2step_TF(k,:), L);
+    end
+    tx_2step = reshape(tx_time_temp, K*L, 1);
+
+        % --- pulse shaping ---
+        span = 4;                                   % ±4Ts
+        t_ps = Ts / osr;                            % sampling interval
+        pulse_t = -span*Ts : t_ps : span*Ts;
+        pulse = pulse_shape(pulse_t, Ts, rolloff);  % γ = rolloff
+        
+        % --- pulse shaping for DZT-OTFS ---
+        tx_dzt_upsamp = upsample(tx_dzt, osr);  % 插值
+        tx_dzt_shaped = conv(tx_dzt_upsamp, pulse, 'full');
+        t_vec_dzt = (0:length(tx_dzt_shaped)-1) * t_ps;
+        
+        % --- pulse shaping for 2-step OTFS ---
+        tx_2step_upsamp = upsample(tx_2step, osr);
+        tx_2step_shaped = conv(tx_2step_upsamp, pulse, 'full');
+        t_vec_2step = (0:length(tx_2step_shaped)-1) * t_ps;
+        
+        % -------------------------------
+        % Channel + Match Filter for DZT-OTFS
+        % -------------------------------
+        alpha_max = round(tau_max / Ts);
+        N_os = length(tx_dzt_shaped);
+        t_sps = Ts / osr;
+        t_vec = (0:N_os-1) * t_sps;
+        pulse_match = fliplr(pulse_shape(-4*Ts:t_sps:4*Ts, Ts, rolloff));
+        
+        y_dzt_rx = zeros(size(tx_dzt_shaped));
+        path_params_dzt = zeros(P, 3);      % [tau_i, nu_i, h_i]
+        
+        for p = 1:P
+            alpha_i = randi([0 alpha_max]); % integer delay of path i
+            a_i = rand() - 0.5;             % fractional delay of path i
+            tau_i = (alpha_i + a_i) * Ts;   % delay of path i
+            %tau_i = (alpha_i ) * Ts;   % delay of path i
+        
+            theta = rand()*2*pi - pi;       % integer doppler of path i
+            b_i = rand() - 0.5;             % fractional dopller of path i
+            nu_i = nu_max * cos(theta) + b_i / (K * L * Ts); % doppler of path i
+            %nu_i = nu_max * cos(theta) / (K * L * Ts); % doppler of path i
+        
+            h_i = (randn + 1j * randn)/sqrt(2);  % CN(0,1)
+        
+            % Apply Doppler
+            doppler_shifted = tx_dzt_shaped(:).' .* exp(1j * 2 * pi * nu_i * t_vec);
+        
+            % Fractional delay via interpolation
+           
+            delayed = interp1(t_vec, doppler_shifted, t_vec - tau_i, 'linear', 0);
+        
+            % Matched filter
+            filtered = conv(delayed, pulse_match, 'same');
+        
+            % Accumulate
+            y_dzt_rx = y_dzt_rx + h_i * filtered;
+        
+            % Record path info
+            path_params_dzt(p, :) = [tau_i, nu_i, h_i]; % Store mutipath channel parameter
+        end
+        
+        % -------------------------------
+        % Channel + Match Filter for 2-step OTFS
+        % -------------------------------
+        y_2step_rx = zeros(size(tx_2step_shaped));
+        %pulse_match = fliplr(pulse_shape(-4*Ts:t_sps:4*Ts, Ts, rolloff));  % 同樣的匹配濾波器
+        
+        for p = 1:P
+            tau_i = path_params_dzt(p, 1);
+            nu_i  = path_params_dzt(p, 2);
+            h_i   = path_params_dzt(p, 3);
+        
+            % Apply Doppler
+            doppler_shifted = tx_2step_shaped(:).' .* exp(1j * 2 * pi * nu_i * t_vec_2step);
+        
+            % Fractional delay via interpolation
+            delayed = interp1(t_vec_2step, doppler_shifted, t_vec_2step - tau_i, 'linear', 0);
+            
+            % Matched filter
+            filtered = conv(delayed, pulse_match, 'same');
+        
+            % Accumulate
+            y_2step_rx = y_2step_rx + h_i * filtered;
+        end
+        
+        % Add AWGN
+        noise = sqrt(noise_var/2) * (randn(size(y_dzt_rx)) + 1j*randn(size(y_dzt_rx)));
+        y_dzt_rx = y_dzt_rx + noise;
+        y_2step_rx = y_2step_rx + noise;
+        
+        % -------------------------------
+        % Delay-Time Grid Sampling (Ts-spaced)
+        % -------------------------------
+        
+        % 每 Ts 對應 oversample 個點
+        sample_interval = osr;  % 因為 Ts / (Ts/oversample) = oversample
+        
+        % 計算起始中心點（假設中心對齊）
+        center_index_dzt = round(length(y_dzt_rx)/2 - (K*L)/2*sample_interval);
+        center_index_2step = round(length(y_2step_rx)/2 - (K*L)/2*sample_interval);
+        
+        % 從中心往後每 Ts 抽樣 K*L 點
+        indices_dzt = center_index_dzt + (0:K*L-1) * sample_interval;
+        indices_2step = center_index_2step + (0:K*L-1) * sample_interval;
+        
+        % 避免超出邊界
+        indices_dzt(indices_dzt > length(y_dzt_rx)) = [];
+        indices_2step(indices_2step > length(y_2step_rx)) = [];
+        
+        % 取樣
+        samples_dzt = y_dzt_rx(indices_dzt);
+        samples_2step = y_2step_rx(indices_2step);
+        
+        % reshape 成 K×L delay-time grid
+        Zy_dzt_rx = reshape(samples_dzt, K, L);
+        Zy_2step_rx = reshape(samples_2step, K, L);
+        % -------------------------------
+        % Delay-Time Grid → Delay-Doppler Domain
+        % -------------------------------
+        
+        % --- DZT Zak inverse: 每欄做 K 點 FFT ---
+        rx_dzt_DD = zeros(K, L);
+        for l = 1:L
+            rx_dzt_DD(:, l) = fft(Zy_dzt_rx(:, l), K);
+        end
+        
+        % --- 2-step OTFS  FFT+SFFT: FFT overdelay, IFFT over delay, then FFT over Doppler ---
+        % freq to delay(K-point IFFT)
+        rx_2step_TF = zeros(K,L);
+        for k= 1:K
+            rx_2step_TF(k,:) = fft(Zy_2step_rx(k,:), L);
+        end
+        Ztemp = zeros(K, L);
+        for l = 1:L
+            Ztemp(:, l) = ifft(rx_2step_TF(:, l), K);  % Doppler IFFT
+        end
+        rx_2step_DD = zeros(K, L);
+        for k = 1:K
+            rx_2step_DD(k, :) = ifft(Ztemp(k, :), L);    % Delay FFT
+        end
+        % -------------------------------
+        % MMSE Detection + BER Evaluation
+        % -------------------------------
+        % vectorize Y_DD
+        z_dzt_rx_vec = reshape(rx_dzt_DD, [], 1);
+        z_2step_rx_vec = reshape(rx_2step_DD, [], 1);
+        
+        % -------------------------------
+        % Construct H_dd from path_params_dzt (dense matrix)
+        % -------------------------------
+        H_dd = zeros(K*L, K*L);
+        
+        for p = 1:size(path_params_dzt, 1)
+            tau_i = path_params_dzt(p, 1);
+            nu_i  = path_params_dzt(p, 2);
+            h_i   = path_params_dzt(p, 3);
+        
+            alpha_i = round(tau_i / Ts);                         % delay bin
+            beta_i  = round(nu_i * K * L * Ts);                  % doppler bin
+        %{
+            if alpha_i < 0 || alpha_i >= L || beta_i < 0 || beta_i >= K
+                continue;  % truncate if out of range
+            end
+        %}
+            for m = 0:K-1
+                for n = 0:L-1
+                    input_idx = m * L + n + 1;
+                    out_k = mod(m + beta_i,  K);
+                    out_l = mod(n + alpha_i, L);
+                    output_idx = out_k * L + out_l + 1;
+                    H_dd(output_idx, input_idx) = H_dd(output_idx, input_idx) + h_i;
+                end
+            end
+        end
+        
+    
+        % MMSE 偵測矩陣
+        W_mmse = (H_dd' * H_dd + noise_var * eye(K*L)) \ H_dd';
+        
+        % === DZT-OTFS detection ===
+        z_dzt_eq = W_mmse * z_dzt_rx_vec;
+        demod_dzt_bits = real(z_dzt_eq) > 0;
+        err_dzt = err_dzt + sum(tx_bits ~= demod_dzt_bits);
+        
+        % === 2-step OTFS detection ===
+        z_2step_eq = W_mmse * z_2step_rx_vec;
+        demod_2step_bits = real(z_2step_eq) > 0;
+        err_2step = err_2step + sum(tx_bits ~= demod_2step_bits);
+        
+        total_bits = total_bits + length(tx_bits);
+        if mod(trial,10) == 0
+        fprintf("===== %d iteration complete ====\n",trial);
+        end
+    end  
+    ber_dzt(idx) = err_dzt / total_bits;
+    ber_2step(idx) = err_2step / total_bits;
+
+    fprintf('SNR = %2d dB: DZT-BER = %.4e, 2step-BER = %.4e\n', ...
+        SNR_dB, ber_dzt(idx), ber_2step(idx));
+
+end
+% -------------------------------
+% BER vs SNR Plot
+% -------------------------------
+figure;
+semilogy(SNR_dB_range, ber_dzt, 'o-', 'LineWidth', 2); hold on;
+semilogy(SNR_dB_range, ber_2step, 's--', 'LineWidth', 2);
+grid on;
+xlabel('SNR (dB)');
+ylabel('Bit Error Rate');
+legend('DZT-OTFS', '2-step OTFS', 'Location', 'southwest');
+title('BER vs. SNR (Figure 4: \nu_{max}=937Hz, \tau_{max}=8T_s)');
+
+
+
+%% DZT OTFS signal 3D plot
+figure; bar3(real(Zx)); title('DZT OTFS (Delay-Doppler domain waveform)'); xlabel('l'); ylabel('k');
+figure; bar3(real(reshape(tx_dzt, K, L))); title('DZT OTFS (Delay-Time domain waveform)'); xlabel('time index'); ylabel('symbol');
+figure; plot(real(tx_dzt_shaped)); title('DZT OTFS Transmited pulse shaped Time domain Waveform'); xlabel('frame index'); ylabel('(Real)');
+figure; bar3(real(reshape(Zy_dzt_rx, K, L))); title('DZT OTFS Zy(Delay Time Domain, received)'); xlabel('l'); ylabel('k');
+figure; bar3(real(reshape(rx_dzt_DD, K, L))); title('DZT OTFS Zy(Delay Doppler Domain, received)'); xlabel('l'); ylabel('k');
+figure; bar3(real(reshape(z_dzt_eq(:), K, L))); title('DZT OTFS Z\_equalized (MMSE)'); xlabel('l'); ylabel('k');
+
+%% 2-step OTFS signal 3D plot
+figure; bar3(real(Zx)); title('2-step OTFS (Delay-Doppler domain waveform)'); xlabel('l'); ylabel('k');
+figure; bar3(real(reshape(tx_2step, K, L))); title('2-step OTFS (Delay-Time domain waveform)'); xlabel('time index'); ylabel('symbol');
+figure; plot(real(tx_2step_shaped)); title('2-step OTFS Transmited pulse shaped Time domain Waveform'); xlabel('frame index'); ylabel('(Real)');
+figure; bar3(real(reshape(Zy_2step_rx, K, L))); title('2-step OTFS (Delay-Time Domain, received)'); xlabel('l'); ylabel('k');
+figure; bar3(real(reshape(rx_2step_DD, K, L))); title('2-step OTFS Zy(Delay Doppler Domain, received)'); xlabel('l'); ylabel('k');
+figure; bar3(real(reshape(z_2step_eq(:), K, L))); title('2-step OTFS Z\_equalized (MMSE)'); xlabel('l'); ylabel('k');
+
+figure; bar3(abs(H_dd)); title('Delay Doppler domain channel matrix H\_dd (abs)'); xlabel('delay'); ylabel('doppler');

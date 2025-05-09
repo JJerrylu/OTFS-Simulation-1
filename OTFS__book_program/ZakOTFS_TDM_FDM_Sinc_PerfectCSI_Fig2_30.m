@@ -14,9 +14,8 @@ clear all;
 % berTDM, berFDM and berOTFS respectively. This program simulates a single
 % SNR point for the curves in Fig. 2.30 of the book.
 % =========================================================================
-
 %----- Program INPUTs---------------------
-NUM_ITR = 1000; % No. of iterations for BER averaging
+NUM_ITR = 10; % No. of iterations for BER averaging
 B = 0.96e6; % Pulsone bandwidth in Hz
 T = 1.6e-3; % Pulsone time in seconds
 nup = 15e3; % Zak-OTFS modulation parameter \nu_p in Hz
@@ -180,7 +179,7 @@ for itr=1:1:NUM_ITR
     
     
     % FDM< frame generation, transmission, reception and equalization
-    xmsg = randi([1 4 ], M*N, 1);
+    xmsg = randi([1 4], M*N, 1);
     xinf = zeros(M*N,1);
     for u=1:1:M*N
      xinf(u) = symbvec(xmsg(u)) ; % Frequency domain (FD) 4-QAM information symbols

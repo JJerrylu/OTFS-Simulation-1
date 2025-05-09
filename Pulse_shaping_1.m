@@ -1,40 +1,68 @@
-% Parameters
-sps = 8;                 % Samples per symbol
-span = 10;               % Symbols
-N = span * sps + 1;      % Total number of samples
-t = (-span/2 : 1/sps : span/2);  % Time vector
+% --- Parameters ---
+Ts = 1;            % Symbol duration
+gamma = 0;       % Roll-off factor
+span = 6;          % Pulse span in symbol durations
+L = 10;             % Oversampling factor (samples per Ts)
+num_symbols = 100;  % Number of symbols
 
-% Ideal sinc pulse
-sincPulse = sinc(t);
+% --- Generate random BPSK symbols ---
+%symbols = 2 * randi([0 1], 1, num_symbols) - 1;   % BPSK: ±1
+symbols =ones(1,num_symbols);
+% --- Generate raised cosine pulse ---
+g = raised_cosine_pulse(Ts, gamma, span, L);
 
-% Define windows
-rectWindow = ones(size(sincPulse));              % Rectangular (no taper)
-hammingWindow = hamming(length(sincPulse))';     % Hamming window
-hannWindow = hann(length(sincPulse))';           % Hann window
+% --- Upsample symbol sequence ---
+upsampled = zeros(1, num_symbols * L);
+upsampled(1:L:end) = symbols;  % Insert zeros between symbols
 
-% Apply windows
-sincRect = sincPulse .* rectWindow;
-sincHamming = sincPulse .* hammingWindow;
-sincHann = sincPulse .* hannWindow;
+% --- Perform pulse shaping by convolution ---
+tx_signal = conv(upsampled, g, 'full');  % shaped baseband signal
 
-% Plot Time Domain
+% --- Time axis for plotting ---
+T_total = length(tx_signal);
+t_axis = (0:T_total-1) * (Ts / L);  % time in seconds
+
+% --- Plot results ---
 figure;
-subplot(3,1,1); plot(t, sincRect); title('Sinc with Rectangular Window'); xlabel('Time'); ylabel('Amplitude');
-subplot(3,1,2); plot(t, sincHamming); title('Sinc with Hamming Window'); xlabel('Time'); ylabel('Amplitude');
-subplot(3,1,3); plot(t, sincHann); title('Sinc with Hann Window'); xlabel('Time'); ylabel('Amplitude');
+plot(t_axis, tx_signal, 'b'); grid on;
+xlabel('Time (s)');
+ylabel('Amplitude');
+title('Pulse-Shaped Baseband Signal');
 
-% Plot Frequency Domain
-figure;
-[H1, f] = freqz(sincRect, 1, 1024, sps*1e3);
-[H2, ~] = freqz(sincHamming, 1, 1024, sps*1e3);
-[H3, ~] = freqz(sincHann, 1, 1024, sps*1e3);
+function g = raised_cosine_pulse(Ts, gamma, span, L)
+% Ts     - Symbol duration
+% gamma  - Roll-off factor (0 <= gamma <= 1)
+% span   - Pulse span in symbol durations (e.g., 6 means [-3T, 3T])
+% L      - Oversampling factor (samples per Ts)
 
-plot(f, 20*log10(abs(H1)), 'r', 'DisplayName','Rectangular');
-hold on;
-plot(f, 20*log10(abs(H2)), 'b', 'DisplayName','Hamming');
-plot(f, 20*log10(abs(H3)), 'g', 'DisplayName','Hann');
-legend;
-xlabel('Frequency (Hz)');
-ylabel('Magnitude (dB)');
-title('Frequency Response of Windowed Sinc Filters');
-grid on;
+% Total pulse duration
+T_total = span * Ts;                 
+t = -T_total/2 : Ts/L : T_total/2;   % time axis
+
+% Initialize g(t)
+g = zeros(size(t));
+
+for i = 1:length(t)
+    ti = t(i);
+    
+    % Handle t == 0 (singularity)
+    if abs(ti) < 1e-8
+        g(i) = 1;
+    % Handle denominator zero (sinc singularity)
+    elseif abs(abs(2 * gamma * ti / Ts) - 1) < 1e-8
+        g(i) = (pi/4) * sinc(1/(2 * gamma));
+    else
+        numerator = sin(pi * ti / Ts) .* cos(gamma * pi * ti / Ts);
+        denominator = (pi * ti / Ts) .* (1 - (2 * gamma * ti / Ts)^2);
+        g(i) = numerator / denominator;
+    end
+end
+
+% Normalize energy (optional)
+g = g / norm(g);
+
+% Plot (optional)
+% figure; plot(t, g);
+% xlabel('Time'); ylabel('g(t)'); title('Raised Cosine Pulse');
+end
+
