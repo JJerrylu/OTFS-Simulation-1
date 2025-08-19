@@ -107,7 +107,7 @@ function [H_dd,delay_p, doppler_p, gain_p ] = generate_dd_channel(K, L, P, Ts, t
                 out_k = mod(m + delay_p(p), K);
                 out_l = mod(n + doppler_p(p), L);
                 out_idx = out_k*L + out_l + 1;
-                H_dd(out_idx, in_idx) = H_dd(out_idx, in_idx) + gain_p(p);
+                H_dd(out_idx, in_idx) = H_dd(out_idx, in_idx) + gain_p(p)*phase_shift_p(p);
             end
         end
     end
@@ -116,7 +116,7 @@ end
 %% parameter（Figure 4）
 % ----------------------------
 snr_dB_range = 0:5:25;
-num_iter = 1;
+num_iter = 200;
 P = 4;
 tau_max = 8 * Ts;
 nu_max = 937;  % Hz
@@ -181,10 +181,11 @@ end
 %% DZT OTFS signal 3D plot
 figure; bar3(real(Zx)); title('DZT OTFS (Delay-Doppler domain waveform)'); xlabel('l'); ylabel('k');
 figure; bar3(real(reshape(tx_dzt, K, L))); title('DZT OTFS (Delay-Time domain waveform)'); xlabel('time index'); ylabel('symbol');
-figure; 
-hold on; 
-stem(real(tx_dzt), "filled"); stem(imag(tx_dzt), "filled") ;  legend('real part', 'imaginary part'); grid on;
-title('DZT OTFS Transmited Time domain Waveform'); xlabel('frame index'); ylabel('Amplitude');
+figure; hold on; grid on;
+plot(real(tx_dzt) , "LineWidth", 1.2, "Color", 'r',"Marker", "o"); 
+plot(real(tx_2step), "LineWidth", 0.7, "Color", 'b',"Marker","x" ); 
+title('2-step OTFS Transmited Time domain Waveform'); xlabel('frame index'); ylabel('Amplitude');
+legend('DZT OTFS', 'Two-Step OTFS');
 hold off;
 figure; bar3(real(reshape(Zy_dzt, K, L))); title('DZT OTFS Zy (DD Domain, received)'); xlabel('l'); ylabel('k');
 figure; bar3(real(reshape(Zhat_dzt(:), K, L))); title('DZT OTFS Z\_equalized (MMSE)'); xlabel('l'); ylabel('k');
@@ -192,11 +193,8 @@ figure; bar3(real(reshape(Zhat_dzt(:), K, L))); title('DZT OTFS Z\_equalized (MM
 %% 2-step OTFS signal 3D plot
 figure; bar3(real(Zx)); title('2-step OTFS (Delay-Doppler domain waveform)'); xlabel('l'); ylabel('k');
 figure; bar3(real(reshape(tx_2step, K, L))); title('2-step OTFS (Delay-Time domain waveform)'); xlabel('time index'); ylabel('symbol');
-figure; 
-hold on; 
-stem(real(tx_2step), "filled"); stem(imag(tx_2step), "filled") ;legend('real part', 'imaginary part'); grid on;
-title('2-step OTFS Transmited Time domain Waveform'); xlabel('frame index'); ylabel('Amplitude');
-hold off;
+
+
 figure; bar3(real(reshape(Zy_2step, K, L))); title('2-step OTFS (DD Domain, received)'); xlabel('l'); ylabel('k');
 figure; bar3(real(reshape(Zhat_2step(:), K, L))); title('2-step OTFS Z\_equalized (MMSE)'); xlabel('l'); ylabel('k');
 
