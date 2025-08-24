@@ -27,19 +27,19 @@ X  = zeros(M, N);
 H  = zeros(M, N);
 
 X(M/2, N/2) = 1;
-
-Ni = 3;
+%% rectangular pulse shaping DD domain pilot response
+Ni = 5;
 for l = 0:M-1
     for k = 0:N-1
         for i = 1:tap
             for q =  -Ni:Ni
                 beta = (exp(-1i*2*pi*(-q-frac_doppler_inx(i)))-1)/(exp(-1i*2*pi/N*(-q-frac_doppler_inx(i)))-1);
                 if l>=delay_tap(i) && l<M
-                H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(delay_tap(i))*doppler(i))...
+                H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
                 * 1/N*(beta)...
                 * X(mod(l-delay_tap(i), M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
                 else
-                H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(delay_tap(i))*doppler(i))...
+                H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
                 * 1/N*(beta-1)*exp(-1i*2*pi*mod((k+1-int_doppler_inx(i)+q),N))...
                 * X(mod(l-delay_tap(i), M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
 
