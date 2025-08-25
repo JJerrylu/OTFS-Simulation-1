@@ -29,7 +29,15 @@ for i = 1:MN
     j = j + N;
     j = mod(j, MN);
 end
-x_permuted = P_matrix* x;
-x_permuted_2 = P_matrix.'*x_permuted;
+% P_matrix : N decimation, P_transpose : M decimation
+P_transpose = P_matrix.';
+
+% P*P^T =P^T*P = I
+x_permuted_P = P_matrix * x;
+x_permuted_P_trans = P_transpose * x;
+x_permuted_P_2 = P_transpose * x_permuted_P;
+
+
+
 
 
