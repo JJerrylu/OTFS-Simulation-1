@@ -1,0 +1,121 @@
+clc, clear all
+M = 32;
+N = 32;
+MN = M*N;
+delta_f = 15e3;            % 15kHz
+T = 1/delta_f;             % Block Duration
+fc = 4e9;
+delay_tap = [0.1,2.33,3.4,1.6,4.5,5.4,8.7,13.9,19.1];
+int_delay_inx = round(delay_tap);
+frac_delay_inx = delay_tap - int_delay_inx;
+tap = length(delay_tap);
+
+%% Delay and channel coefficient
+delay = delay_tap/(M*delta_f);
+delay_pow_prof = [0, -1.5, -1.4, -3.6, -0.6, -9.1, -7.0, -12.0, -16.9];
+lin_pow_prof = 10.^(delay_pow_prof/10);
+lin_pow_prof = lin_pow_prof/sum(lin_pow_prof);
+chan_coef = sqrt(lin_pow_prof).*(sqrt(1/2) * (randn(1,tap)+1i*randn(1,tap)));
+
+%% Doppler shift
+max_speed = 500;           % 500 km/h
+v = max_speed*(1000/3600);
+max_doppler = (v*fc)/(299792458);
+doppler = max_doppler*cos(2*pi*rand(1,tap));
+doppler_inx = doppler*(N*T); % Doppler taps using Jake's spectrum
+%doppler_inx = [1, 2, -4, -3, 5, 6, -10, 13, -14];
+%doppler = doppler_inx/(N*T);
+int_doppler_inx = round(doppler_inx);                  % Integer Doppler
+frac_doppler_inx = doppler_inx-int_doppler_inx;        % Fractional Doppler
+
+X  = zeros(M, N);
+H  = zeros(M, N);
+
+X(M/2, N/2) = 1;
+%% rectangular pulse shaping DD domain pilot response
+Ni = N/2-1;
+Np = M/2-1;
+for l = 0:M-1
+    for k = 0:N-1
+        for i = 1:tap
+            %% if integer doppler 
+            %{
+            if frac_doppler_inx(i) == 0
+                      H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
+                    * X(mod(l-delay_tap(i), M)+1, mod(k-int_doppler_inx(i), N)+1);
+                      continue;
+            end
+            %}
+            %% fractional doppler
+            for q =  -Ni:Ni
+                for c = -Np:Np
+                beta = (exp(-1i*2*pi*(-q-frac_doppler_inx(i)))-1)/(exp(-1i*2*pi/N*(-q-frac_doppler_inx(i)))-1);
+                gamma = (exp(-1i*2*pi*(-c-frac_delay_inx(i)))-1)/(exp(-1i*2*pi/M*(-c-frac_delay_inx(i)))-1);
+                if l>=delay_tap(i) && k>=doppler(i)
+                    H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
+                    /N *beta /M *gamma...
+                    * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
+                elseif l>=delay_tap(i) && k<doppler(i)
+                    H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
+                    /N*(beta-1)*exp(-1i*2*pi*mod((k-int_doppler_inx(i)+q),N))...
+                    /M*gamma...
+                    * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
+                elseif l<delay_tap(i) && k>=doppler(i)
+                    H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
+                    /N *beta...
+                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_doppler_inx(i)+c),M))...
+                    * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
+                elseif l<delay_tap(i) && k<doppler(i)
+                    H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
+                    /N *(beta-1)*exp(-1i*2*pi*mod((k-int_doppler_inx(i)+q),N))...
+                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_doppler_inx(i)+c),M))...
+                    * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
+                end
+                end
+            end
+     
+            
+        end
+    end
+end
+
+channel_envelope = abs(H);
+%% Plot
+figure; bar3(abs(X));
+figure; bar3(channel_envelope); title('Delay Doppler domain channel matrix H\_dd (abs)'); xlabel('doppler'); ylabel('delay');
+
+figure;
+imagesc(0:N-1, 0:M-1, channel_envelope);
+set(gca,'YDir','normal'); 
+xlabel('Doppler Index'); ylabel('Delay Index');
+title('Delay-Doppler Channel Magnitude');
+colormap(jet); colorbar;
+
+% Smooth the image display
+shading interp;   % <-- makes it smooth
+
+[dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
+figure;
+pcolor(dd_k, dd_l, channel_envelope);
+shading interp;   % smooths colors between grid points
+xlabel('Doppler Index'); ylabel('Delay Index');
+title('Delay-Doppler Channel Magnitude (Interpolated)');
+colormap(jet); colorbar;
+
+[dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
+
+% Make a finer grid (e.g., 4x resolution)
+[dd_kq, dd_lq] = meshgrid(0:0.25:N-1, 0:0.25:M-1);
+
+% Interpolate values
+channel_interp = interp2(dd_k, dd_l, channel_envelope, dd_kq, dd_lq, 'spline');
+
+% Plot
+figure;
+imagesc(0:N-1, 0:M-1, channel_interp);
+set(gca,'YDir','normal');
+xlabel('Doppler Index'); ylabel('Delay Index');
+title('Delay-Doppler Channel Magnitude (Spline Interpolation)');
+colormap(jet); colorbar;
+
+
