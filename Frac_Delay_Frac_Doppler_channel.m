@@ -1,6 +1,6 @@
 clc, clear all
-M = 512;
-N = 128;
+M = 64;
+N = 64;
 MN = M*N;
 delta_f = 15e3;            % 15kHz
 T = 1/delta_f;             % Block Duration
@@ -63,12 +63,12 @@ for l = 0:M-1
                 elseif l<delay_tap(i) && k>=doppler(i)
                     H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
                     /N *beta...
-                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_doppler_inx(i)+c),M))...
+                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_delay_inx(i)+c),M))...
                     * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
                 elseif l<delay_tap(i) && k<doppler(i)
                     H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
                     /N *(beta-1)*exp(-1i*2*pi*mod((k-int_doppler_inx(i)+q),N))...
-                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_doppler_inx(i)+c),M))...
+                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_delay_inx(i)+c),M))...
                     * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
                 end
                 end
@@ -94,7 +94,7 @@ colormap(jet); colorbar;
 
 [dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
 % Make a finer grid (e.g., 4x resolution)
-[dd_kq, dd_lq] = meshgrid(0:0.025:N-1, 0:0.025:M-1);
+[dd_kq, dd_lq] = meshgrid(0:0.1:N-1, 0:0.1:M-1);
 
 % Interpolate values
 channel_interp = interp2(dd_k, dd_l, channel_envelope, dd_kq, dd_lq,"cubic");
