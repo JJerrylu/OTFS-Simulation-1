@@ -96,9 +96,10 @@ colormap(jet); colorbar;
 
 
 [dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
-% Make a finer grid (10x resolution)
+% Make a finer grid (e.g., 4x resolution)
 [dd_kq, dd_lq] = meshgrid(0:0.1:N-1, 0:0.1:M-1);
-% Interpolation to make response continuous
+
+% Interpolate values
 channel_interp = interp2(dd_k, dd_l, channel_envelope, dd_kq, dd_lq,"cubic");
 
 figure;
