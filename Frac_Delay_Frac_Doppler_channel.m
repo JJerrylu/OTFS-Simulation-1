@@ -1,11 +1,14 @@
 clc, clear all
-M = 512;
-N = 128;
+M = 64;
+N = 64;
 MN = M*N;
 delta_f = 15e3;            % 15kHz
 T = 1/delta_f;             % Block Duration
+delay_resolution = 1/M/delta_f;
+doppler_resolution = 1/N/T;
 fc = 4e9;
-delay_tap = [0.00001,1.1, 2.33, 3.2, 4.6 5.4, 8.7, 13.9, 19.5];
+delay_tap = [0.00001,1.1, 2.33, 3.2, 4.08, 5.42, 8.71, 13.9, 19.5];
+%delay_tap = [0.00001, 5, 10, 20, 25, 35, 45, 60, 90 ]+[0 rand(1, 8)];
 int_delay_inx = round(delay_tap);
 frac_delay_inx = delay_tap - int_delay_inx;
 tap = length(delay_tap);
@@ -33,8 +36,8 @@ H  = zeros(M, N);
 
 X(M/2, N/2) = 1;
 %% rectangular pulse shaping DD domain pilot response
-Ni = N/2-1;
-Np = M/2-1;
+Ni = N/4-1;
+Np = M/4-1;
 for l = 0:M-1
     for k = 0:N-1
         for i = 1:tap
@@ -63,12 +66,12 @@ for l = 0:M-1
                 elseif l<delay_tap(i) && k>=doppler(i)
                     H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
                     /N *beta...
-                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_doppler_inx(i)+c),M))...
+                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_delay_inx(i)+c),M))...
                     * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
                 elseif l<delay_tap(i) && k<doppler(i)
                     H(l+1, k+1) = H(l+1,k+1)+ chan_coef(i)*exp(-1i*2*pi*(l-delay_tap(i))*doppler(i))...
                     /N *(beta-1)*exp(-1i*2*pi*mod((k-int_doppler_inx(i)+q),N))...
-                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_doppler_inx(i)+c),M))...
+                    /M *(gamma-1)*exp(-1i*2*pi*mod((l-int_delay_inx(i)+c),M))...
                     * X(mod(l-int_delay_inx(i)+c, M)+1, mod(k-int_doppler_inx(i)+q, N)+1);
                 end
                 end
@@ -82,7 +85,7 @@ end
 channel_envelope = abs(H);
 %% Plot
 figure; bar3(abs(X));
-figure; bar3(channel_envelope); title('Delay Doppler domain channel matrix H\_dd (abs)'); xlabel('doppler'); ylabel('delay');
+figure; bar3(channel_envelope); title('Delay Doppler domain channel magnitude(abs)'); xlabel('doppler'); ylabel('delay');
 
 figure;
 imagesc(0:N-1, 0:M-1, channel_envelope);
@@ -93,18 +96,16 @@ colormap(jet); colorbar;
 
 
 [dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
-% Make a finer grid (e.g., 4x resolution)
-[dd_kq, dd_lq] = meshgrid(0:0.025:N-1, 0:0.025:M-1);
-
-% Interpolate values
+% Make a finer grid (10x resolution)
+[dd_kq, dd_lq] = meshgrid(0:0.1:N-1, 0:0.1:M-1);
+% Interpolation to make response continuous
 channel_interp = interp2(dd_k, dd_l, channel_envelope, dd_kq, dd_lq,"cubic");
 
-% Plot
 figure;
 imagesc(0:N-1, 0:M-1, channel_interp);
 set(gca,'YDir','normal');
 xlabel('Doppler Index'); ylabel('Delay Index');
-title('Delay-Doppler Channel Magnitude (Spline Interpolation)');
+title('Delay-Doppler Channel Magnitude (Interpolation)');
 colormap(jet); colorbar;
-
+toc
 

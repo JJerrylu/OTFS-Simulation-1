@@ -1,11 +1,14 @@
 clc, clear all
-M = 32;
-N = 32;
+M = 512;
+N = 128;
 MN = M*N;
 delta_f = 15e3;            % 15kHz
 T = 1/delta_f;             % Block Duration
+delay_resolution = 1/M/delta_f;
+doppler_resolution = 1/N/T;
 fc = 4e9;
-delay_tap = [0.1,2.33,3.4,1.6,4.5,5.4,8.7,13.9,19.1];
+delay_tap = [0.00001,1.1, 2.33, 3.2, 4.36, 5.42, 8.71, 13.9, 19.5];
+%delay_tap = [0.00001, 5, 10, 20, 25, 35, 45, 60, 90 ]+[0 rand(1, 8)];
 int_delay_inx = round(delay_tap);
 frac_delay_inx = delay_tap - int_delay_inx;
 tap = length(delay_tap);
@@ -33,8 +36,8 @@ H  = zeros(M, N);
 
 X(M/2, N/2) = 1;
 %% rectangular pulse shaping DD domain pilot response
-Ni = N/2-1;
-Np = M/2-1;
+Ni = N/4-1;
+Np = M/4-1;
 for l = 0:M-1
     for k = 0:N-1
         for i = 1:tap
@@ -91,31 +94,18 @@ xlabel('Doppler Index'); ylabel('Delay Index');
 title('Delay-Doppler Channel Magnitude');
 colormap(jet); colorbar;
 
-% Smooth the image display
-shading interp;   % <-- makes it smooth
 
 [dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
-figure;
-pcolor(dd_k, dd_l, channel_envelope);
-shading interp;   % smooths colors between grid points
-xlabel('Doppler Index'); ylabel('Delay Index');
-title('Delay-Doppler Channel Magnitude (Interpolated)');
-colormap(jet); colorbar;
+% Make a finer grid (10x resolution)
+[dd_kq, dd_lq] = meshgrid(0:0.1:N-1, 0:0.1:M-1);
+% Interpolation to make response continuous
+channel_interp = interp2(dd_k, dd_l, channel_envelope, dd_kq, dd_lq,"cubic");
 
-[dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
-
-% Make a finer grid (e.g., 4x resolution)
-[dd_kq, dd_lq] = meshgrid(0:0.25:N-1, 0:0.25:M-1);
-
-% Interpolate values
-channel_interp = interp2(dd_k, dd_l, channel_envelope, dd_kq, dd_lq, 'spline');
-
-% Plot
 figure;
 imagesc(0:N-1, 0:M-1, channel_interp);
 set(gca,'YDir','normal');
 xlabel('Doppler Index'); ylabel('Delay Index');
 title('Delay-Doppler Channel Magnitude (Spline Interpolation)');
 colormap(jet); colorbar;
-
+toc
 
