@@ -1,7 +1,7 @@
-clc, clear all
+clc, clear all, close all
 M = 64;
 CP_length = 8;
-N = 64;
+N = 32;
 MN = M*N;
 frame_length = MN+CP_length*N;
 delta_f = 15e3;            % 15kHz
@@ -31,11 +31,15 @@ doppler_inx = doppler*(N*T); % Doppler taps using Jake's spectrum
 int_doppler_inx = round(doppler_inx);                  % Integer Doppler
 frac_doppler_inx = doppler_inx-int_doppler_inx;        % Fractional Doppler
 
-X_DD  = zeros(M, N);
-X_DD(M/2, N/2) = 1; 
+X_DD     = zeros(M, N);
+X_DD(M/2, N/2) = 10;
 X_DD_vec = reshape(X_DD, MN, 1);
-S   = ifft(X_DD, N)/sqrt(N);
-S_vec   = reshape(S, MN, 1);
+%s        = ifft(X_DD, N, 2); % delay time domain transmitted symbol
+F_N     = dftmtx(N);
+F_N     = F_N/norm(F_N);
+F_N_H   = F_N';
+s = X_DD*F_N_H;
+s_vec    = reshape(s, MN, 1);     % time domain transmitted symbol
 H   = zeros(MN, MN);
 
 doppler_mtx = zeros(M,M);
@@ -53,30 +57,66 @@ for n = 1:N
     
         H((n-1)*M+1:n*M, (n-1)*M+1:n*M) = H_n;
 end
+noise = sqrt(1/2)*(randn(MN, 1)+1i*randn(MN,1)); 
+r_vec = H * s_vec + noise ;              % Vectorized Time domain IO relation
+r     = reshape(r_vec, M, N);    % Delay-Time domain recieved symbol
+F_NM    = kron(F_N, eye(M));
+F_NM_H  = F_NM';
 
-F_N    = fft(eye(N))/sqrt(N);
-%F_N_H  = ifft(eye(N))/sqrt(N);
-F_NM   = kron(F_N, eye(M));
-%F_NM_H = kron(F_N_H, eye(M));
-F_NM_H = F_NM';
-H_eq   = F_NM * H * F_NM_H;
-Y_DD_vec   = H_eq * X_DD_vec ;
-Y_DD = reshape(Y_DD_vec, M , N);
-channel_envelope = abs(Y_DD);
+H_eq     = F_NM * H * F_NM_H;  % DD domain channel matrix
+Y_DD_vec = H_eq * X_DD_vec + F_NM*noise;   % Vectorized DD domain IO relation
+Y_DD = reshape(Y_DD_vec, M , N); % Received DD grid
+%Y_DD_verify = fft(r, N, 2);
+Y_DD_verify = r*F_N;
 %% Plot
-figure; bar3(abs(X_DD)); title('DD domain transmitted pilot X\_DD (abs)'); xlabel('doppler'); ylabel('delay');
-figure; bar3(abs(H_n));  title('DD domain channel matrix of n\_th OFDM symbol  H\_n (abs)'); xlabel('doppler'); ylabel('delay');
+%figure; bar3(abs(X_DD)); title('DD domain transmitted pilot X\_DD (abs)'); xlabel('doppler'); ylabel('delay');
+%figure; bar3(abs(H_n));  title('Delay domain channel matrix of n\_th OFDM symbol  H\_n (abs)'); xlabel('doppler'); ylabel('delay');
+figure;
+imagesc(0:M-1, 0:N-1, abs(X_DD));
+set(gca,'XDir','normal'); 
+title('DD domain transmitted symbol Heat Map');
+colormap(jet); colorbar;
+
+figure;
+imagesc(0:M-1, 0:N-1, abs(s));
+set(gca,'XDir','normal'); 
+title('Delay_time domain transmitted symbol Heat Map');
+colormap(jet); colorbar;
+
+figure;
+imagesc(0:MN-1, 0:MN-1, abs(H_n));
+set(gca,'XDir','normal'); 
+title('Delay domain channel matrix of n\_th OFDM symbol Heat Map');
+colormap(jet); colorbar;
 
 figure;
 imagesc(0:MN-1, 0:MN-1, abs(H));
 set(gca,'XDir','normal'); 
-title('DD Channel Magnitude');
+title('Time domain Channel Magnitude Heat Map');
+colormap(jet); colorbar;
+
+figure;
+imagesc(0:MN-1, 0:MN-1, abs(r));
+set(gca,'XDir','normal'); 
+title('Delay-Time domain Received Symbol Heat Map');
 colormap(jet); colorbar;
 
 figure;
 imagesc(0:MN-1, 0:MN-1, abs(H_eq));
 set(gca,'XDir','normal'); 
-title('DD Equivalent Channel Magnitude');
+title('DD domain Equivalent Channel Magnitude Heat Map');
 colormap(jet); colorbar;
 
-figure; bar3(abs(Y_DD)); title('DD domain pilot response H\_DD (abs)'); xlabel('doppler'); ylabel('delay');
+figure; bar3(abs(Y_DD)); title('DD domain pilot response Y\_DD (abs)'); xlabel('doppler'); ylabel('delay');
+figure;
+imagesc(0:M-1, 0:N-1, abs(Y_DD));
+set(gca,'XDir','normal'); 
+title('DD domain pilot response Heat Map');
+colormap(jet); colorbar;
+
+figure; bar3(abs(Y_DD_verify)); title('DD domain pilot response Y\_DD (abs)'); xlabel('doppler'); ylabel('delay');
+figure;
+imagesc(0:M-1, 0:N-1, abs(Y_DD_verify));
+set(gca,'XDir','normal'); 
+title('DD domain pilot response Heat Map');
+colormap(jet); colorbar;
