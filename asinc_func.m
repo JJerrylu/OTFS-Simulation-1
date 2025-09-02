@@ -68,5 +68,8 @@ end
 stem(nu, abs(beta(i,:)), "filled");
 end
 hold off;
+
+total_path_response = sum(beta,1);
+total_path_energy = sum(abs(total_path_response).^2);
 subplot(313)
-stem(nu, abs(sum(beta,1)), "filled");
+stem(nu, abs(total_path_response), "filled");
