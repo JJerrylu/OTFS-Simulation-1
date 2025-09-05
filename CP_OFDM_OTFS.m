@@ -120,3 +120,14 @@ imagesc(0:M-1, 0:N-1, abs(Y_DD_verify));
 set(gca,'XDir','normal'); 
 title('DD domain pilot response Heat Map');
 colormap(jet); colorbar;
+
+imagesc(0:MN-1, 0:MN-1, real(F_NM));
+set(gca,'XDir','normal'); 
+title('F\_NM');
+colormap(jet); colorbar;
+
+imagesc(0:MN-1, 0:MN-1, real(F_NM));
+set(gca,'XDir','normal'); 
+title('F\_NM');
+colormap(jet); colorbar;
+
