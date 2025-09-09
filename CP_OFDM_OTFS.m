@@ -1,7 +1,7 @@
 clc, clear all, close all
-M = 64;
-CP_length = 8;
-N = 32;
+M = 512;
+CP_length = 64;
+N = 128;
 MN = M*N;
 frame_length = MN+CP_length*N;
 delta_f = 15e3;            % 15kHz
@@ -32,7 +32,11 @@ int_doppler_inx = round(doppler_inx);                  % Integer Doppler
 frac_doppler_inx = doppler_inx-int_doppler_inx;        % Fractional Doppler
 
 X_DD     = zeros(M, N);
-X_DD(M/2, N/2) = 10;
+pilot_power_dB = [10 20 30 40];       %dB
+noise = sqrt(1/2)*(randn(MN, 1)+1i*randn(MN,1));    % noise power = 0dB
+
+pilot_power    = 10^(pilot_power_dB/10);
+X_DD(M/2, N/2)  = sqrt(pilot_power);
 X_DD_vec = reshape(X_DD, MN, 1);
 %s        = ifft(X_DD, N, 2); % delay time domain transmitted symbol
 F_N     = dftmtx(N);
@@ -57,9 +61,10 @@ for n = 1:N
     
         H((n-1)*M+1:n*M, (n-1)*M+1:n*M) = H_n;
 end
-noise = sqrt(1/2)*(randn(MN, 1)+1i*randn(MN,1)); 
 r_vec = H * s_vec + noise ;              % Vectorized Time domain IO relation
 r     = reshape(r_vec, M, N);    % Delay-Time domain recieved symbol
+r_vec_noise_free = H * s_vec;              % Vectorized Time domain IO relation
+r_noise_free     = reshape(r_vec_noise_free, M, N);    % Delay-Time domain recieved symbol
 F_NM    = kron(F_N, eye(M));
 F_NM_H  = F_NM';
 
@@ -68,66 +73,77 @@ Y_DD_vec = H_eq * X_DD_vec + F_NM*noise;   % Vectorized DD domain IO relation
 Y_DD = reshape(Y_DD_vec, M , N); % Received DD grid
 %Y_DD_verify = fft(r, N, 2);
 Y_DD_verify = r*F_N;
+Y_DD_noise_free = r_noise_free*F_N;
 %% Plot
 %figure; bar3(abs(X_DD)); title('DD domain transmitted pilot X\_DD (abs)'); xlabel('doppler'); ylabel('delay');
 %figure; bar3(abs(H_n));  title('Delay domain channel matrix of n\_th OFDM symbol  H\_n (abs)'); xlabel('doppler'); ylabel('delay');
+
 figure;
-imagesc(0:M-1, 0:N-1, abs(X_DD));
+imagesc(0:M-1, 0:N-1, abs(X_DD).^2);
 set(gca,'XDir','normal'); 
 title('DD domain transmitted symbol Heat Map');
 colormap(jet); colorbar;
 
 figure;
-imagesc(0:M-1, 0:N-1, abs(s));
+imagesc(0:M-1, 0:N-1, abs(s).^2);
 set(gca,'XDir','normal'); 
 title('Delay_time domain transmitted symbol Heat Map');
 colormap(jet); colorbar;
 
 figure;
-imagesc(0:MN-1, 0:MN-1, abs(H_n));
+imagesc(0:MN-1, 0:MN-1, abs(H_n).^2);
 set(gca,'XDir','normal'); 
 title('Delay domain channel matrix of n\_th OFDM symbol Heat Map');
 colormap(jet); colorbar;
 
 figure;
-imagesc(0:MN-1, 0:MN-1, abs(H));
+imagesc(0:MN-1, 0:MN-1, abs(H).^2);
 set(gca,'XDir','normal'); 
 title('Time domain Channel Magnitude Heat Map');
 colormap(jet); colorbar;
 
 figure;
-imagesc(0:MN-1, 0:MN-1, abs(r));
+imagesc(0:M-1, 0:N-1, abs(r).^2);
 set(gca,'XDir','normal'); 
 title('Delay-Time domain Received Symbol Heat Map');
 colormap(jet); colorbar;
 
 figure;
-imagesc(0:MN-1, 0:MN-1, abs(H_eq));
+imagesc(0:M-1, 0:N-1, abs(r_noise_free).^2);
+set(gca,'XDir','normal'); 
+title('Delay-Time domain noise free Received Symbol Heat Map');
+colormap(jet); colorbar;
+
+figure;
+imagesc(0:MN-1, 0:MN-1, abs(H_eq).^2);
 set(gca,'XDir','normal'); 
 title('DD domain Equivalent Channel Magnitude Heat Map');
 colormap(jet); colorbar;
 
-figure; bar3(abs(Y_DD)); title('DD domain pilot response Y\_DD (abs)'); xlabel('doppler'); ylabel('delay');
+figure; bar3(abs(Y_DD).^2); title('DD domain pilot response Y\_DD (abs)'); xlabel('doppler'); ylabel('delay');
 figure;
-imagesc(0:M-1, 0:N-1, abs(Y_DD));
+imagesc(0:M-1, 0:N-1, abs(Y_DD).^2);
 set(gca,'XDir','normal'); 
 title('DD domain pilot response Heat Map');
 colormap(jet); colorbar;
 
-figure; bar3(abs(Y_DD_verify)); title('DD domain pilot response Y\_DD (abs)'); xlabel('doppler'); ylabel('delay');
+figure; bar3(abs(Y_DD_noise_free).^2); title('DD domain noise free pilot response Y\_DD (abs)'); xlabel('doppler'); ylabel('delay');
 figure;
-imagesc(0:M-1, 0:N-1, abs(Y_DD_verify));
+imagesc(0:M-1, 0:N-1, abs(Y_DD_noise_free).^2);
 set(gca,'XDir','normal'); 
-title('DD domain pilot response Heat Map');
+title('DD domain noise free pilot response Heat Map');
+colormap(jet); colorbar;
+%{
+figure;
+imagesc(0:N-1, 0:N-1, real(F_N));
+set(gca,'XDir','normal'); 
+title('F\_N');
 colormap(jet); colorbar;
 
+figure;
 imagesc(0:MN-1, 0:MN-1, real(F_NM));
 set(gca,'XDir','normal'); 
 title('F\_NM');
 colormap(jet); colorbar;
 
-imagesc(0:MN-1, 0:MN-1, real(F_NM));
-set(gca,'XDir','normal'); 
-title('F\_NM');
-colormap(jet); colorbar;
-
+%}

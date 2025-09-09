@@ -1,4 +1,4 @@
-clc, clear all
+clc, clear all, close all
 M = 64;
 N = 64;
 MN = M*N;
@@ -33,11 +33,22 @@ frac_doppler_inx = doppler_inx-int_doppler_inx;        % Fractional Doppler
 
 X  = zeros(M, N);
 H  = zeros(M, N);
-
-X(M/2, N/2) = 1;
+pilot_power_dB = [10, 20, 30 ,40];
+noise = sqrt(1/2)*(randn(M, N) + 1i*randn(M, N));
+F_N = dftmtx(N);
+F_N = F_N/norm(F_N);
+for ii = 1:4
+H  = zeros(M, N);
+%% Create folder for each pilot power
+folder_name = sprintf('fractional_DD_PilotPower_%ddB', pilot_power_dB(ii));
+if ~exist(folder_name, 'dir')
+    mkdir(folder_name);
+end
+pilot_power = 10^(pilot_power_dB(ii)/10);
+X(M/2, N/2) = sqrt(pilot_power);
 %% rectangular pulse shaping DD domain pilot response
-Ni = N/4-1;
-Np = M/4-1;
+%Ni = N/2;
+%Np = M/2;
 for l = 0:M-1
     for k = 0:N-1
         for i = 1:tap
@@ -50,8 +61,8 @@ for l = 0:M-1
             end
             %}
             %% fractional doppler
-            for q =  -Ni:Ni
-                for c = -Np:Np
+            for q =  0:N-1
+                for c = 0:M-1
                 beta = (exp(-1i*2*pi*(-q-frac_doppler_inx(i)))-1)/(exp(-1i*2*pi/N*(-q-frac_doppler_inx(i)))-1);
                 gamma = (exp(-1i*2*pi*(-c-frac_delay_inx(i)))-1)/(exp(-1i*2*pi/M*(-c-frac_delay_inx(i)))-1);
                 if l>=delay_tap(i) && k>=doppler(i)
@@ -76,25 +87,52 @@ for l = 0:M-1
                 end
                 end
             end
+        
      
             
         end
     end
 end
-
+H_noise_add = H + noise*F_N;
 channel_envelope = abs(H);
+channel_envelope_noise_add = abs(H_noise_add);
 %% Plot
-figure; bar3(abs(X));
-figure; bar3(channel_envelope); title('Delay Doppler domain channel magnitude(abs)'); xlabel('doppler'); ylabel('delay');
-
-figure;
-imagesc(0:N-1, 0:M-1, channel_envelope);
-set(gca,'YDir','normal'); 
+fig = figure; 
+imagesc(0:M-1, 0:N-1, abs(X).^2);
+set(gca,'XDir','normal'); 
 xlabel('Doppler Index'); ylabel('Delay Index');
-title('Delay-Doppler Channel Magnitude');
+title('Delay-Doppler domain transmitted pilot heat map');
 colormap(jet); colorbar;
+saveas(fig, fullfile(folder_name, 'DD_domain_transmitted_pilot_HeatMap.fig')); close(fig);
+
+fig = figure; 
+bar3(channel_envelope_noise_add.^2); title('Delay Doppler domain received channel power(abs)'); xlabel('doppler'); ylabel('delay');
+saveas(fig, fullfile(folder_name, 'DD_domain_received_pilot.fig')); close(fig);
+
+fig = figure;
+imagesc(0:M-1, 0:N-1, channel_envelope_noise_add.^2);
+set(gca,'XDir','normal'); 
+xlabel('Doppler Index'); ylabel('Delay Index');
+title('Delay-Doppler domain received Channel power heat map');
+colormap(jet); colorbar;
+saveas(fig, fullfile(folder_name, 'DD_domain_received_pilot_HeatMap.fig')); close(fig);
 
 
+fig = figure; 
+bar3(channel_envelope.^2); title('Delay-Doppler domain noise free channel power(abs)'); xlabel('doppler'); ylabel('delay');
+saveas(fig, fullfile(folder_name, 'DD_domain_noise_free_received_pilot.fig')); close(fig);
+
+
+fig = figure;
+imagesc(0:M-1, 0:N-1, channel_envelope.^2);
+set(gca,'XDir','normal'); 
+xlabel('Doppler Index'); ylabel('Delay Index');
+title('Delay-Doppler domain noise free received Channel power heat map');
+colormap(jet); colorbar;
+saveas(fig, fullfile(folder_name, 'DD_domain_noise_free_received_pilot_HeatMap.fig')); close(fig);
+
+end
+%{
 [dd_k, dd_l] = meshgrid(0:N-1, 0:M-1);
 % Make a finer grid (e.g., 4x resolution)
 [dd_kq, dd_lq] = meshgrid(0:0.1:N-1, 0:0.1:M-1);
@@ -109,4 +147,4 @@ xlabel('Doppler Index'); ylabel('Delay Index');
 title('Delay-Doppler Channel Magnitude (Interpolation)');
 colormap(jet); colorbar;
 toc
-
+%}

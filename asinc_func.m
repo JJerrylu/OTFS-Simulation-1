@@ -46,7 +46,8 @@ subplot(312)
 hold on;
 for i = 1:3
 %% channel coef
-chan_coef(i) = sqrt(lin_pow_prof(i)).*(sqrt(1/2) * (randn(1)+1i*randn(1)));
+%chan_coef(i) = sqrt(lin_pow_prof(i)).*(sqrt(1/2) * (randn(1)+1i*randn(1)));
+chan_coef = 1;
 %% Doppler shift
 doppler(i) = max_doppler*cos(2*pi*rand(1));
 doppler_inx(i) = doppler(i)*(N*T); % Doppler taps using Jake's spectrum
@@ -56,11 +57,11 @@ int_doppler_inx(i) = round(doppler_inx(i));                  % Integer Doppler
 frac_doppler_inx(i) = doppler_inx(i)-int_doppler_inx(i);
 for k = 0:N-1
         if  frac_doppler_inx(i) ==0
-            beta(i, k+1) = beta(i,k+1) + chan_coef(i)*x(mod(k-int_doppler_inx(i), N)+1);
+            beta(i, k+1) = beta(i,k+1) + chan_coef*x(mod(k-int_doppler_inx(i), N)+1);
             continue;
         end
         for q = 0:N-1
-            beta(i, k+1) = beta(i,k+1) + chan_coef(i)/N*(exp(-1i*2*pi*(-q-frac_doppler_inx(i)))-1)/(exp(-1i*2*pi/N*(-q-frac_doppler_inx(i)))-1)...
+            beta(i, k+1) = beta(i,k+1) + chan_coef/N*(exp(-1i*2*pi*(-q-frac_doppler_inx(i)))-1)/(exp(-1i*2*pi/N*(-q-frac_doppler_inx(i)))-1)...
                         *x(mod(k-int_doppler_inx(i)+q, N)+1);
 %beta(i+1) = exp(-1i*2*pi*mod((k-int_doppler_inx(i)+q),N))
         end
