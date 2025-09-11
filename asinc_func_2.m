@@ -4,8 +4,8 @@ N = 32;                  % Doppler grid size
 L = 100;                 % oversampling factor
 N_os = (N-1)*L+1;        % oversampled points
 
-frac = [3.5, -4.7];   % fractional Doppler shifts
-
+frac = [8.5, -7.7, 0];   % fractional Doppler shifts
+color1 = ['k', 'b','c'];
 % oversampled Doppler axis
 k_os = linspace(-N/2, N/2-1, N_os);
 
@@ -27,17 +27,29 @@ for ii = 1:length(frac)
     end
 
     % plot oversampled curve
-    plot(k_os, abs(kernel_os), 'LineWidth', 1.5);
+    plot(k_os, abs(kernel_os), 'LineWidth', 2,'Color',color1(ii));
+    % save legend entry
+    legend_entries{end+1} = sprintf("frac = %.1f", frac(ii));
 
     % plot discrete samples
-    stem(-N/2:N/2-1, abs(kernel_os(1:L:end)), 'filled');
-
-    % save legend entry
-    legend_entries{end+1} = sprintf("frac = %.2f", frac(ii));
+    stem(-N/2:N/2-1, abs(kernel_os(1:L:end)),'r','LineWidth',1.5);
+    legend_entries{end+1} = sprintf("Integer Sampled Point");
 end
 
 grid on;
-title("Fractional Doppler Asinc Kernel (Oversampled)");
-xlabel("k (oversampled Doppler index)");
-ylabel("|Kernel|");
-legend(legend_entries, 'Location', 'best');
+title = title("Fractional Doppler Asinc Kernel (Oversampled)");
+title.FontSize = 20;
+title.FontWeight = "bold";
+title.Interpreter = "latex";
+xlabel = xlabel("k (oversampled Doppler index)");
+xlabel.FontSize = 20;
+xlabel.Interpreter = "latex";
+ylabel = ylabel("|h|");
+ylabel.FontSize = 20;
+ylabel.Interpreter = "latex";
+lgd = legend(legend_entries);
+lgd.FontSize = 20;
+lgd.FontWeight = "bold";
+lgd.Box = "on";
+lgd.Location = "best";
+lgd.Interpreter = "latex";
